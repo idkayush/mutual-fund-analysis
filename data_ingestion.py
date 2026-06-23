@@ -1,21 +1,23 @@
 from pathlib import Path
 import pandas as pd
 
+
 RAW_DIR = Path("data/raw")
 
+
 def load_all_csv_files():
-    csv_files=list(RAW_DIR.glob("*.csv"))
+    csv_files = list(RAW_DIR.glob("*.csv"))
 
     if not csv_files:
-        print("NO CSV files fount in data/raw.")
-        return{}
-    
-    datasets={}
+        print("No CSV files found in data/raw.")
+        return {}
+
+    datasets = {}
 
     print(f"Found {len(csv_files)} CSV files.\n")
 
     for file_path in csv_files:
-        print("="*100)
+        print("=" * 100)
         print(f"File: {file_path.name}")
 
         try:
@@ -56,11 +58,11 @@ def load_all_csv_files():
 
             possible_date_cols = [
                 col for col in df.columns
-                if "date" in col.lower()
+                if "date" in col.lower() or "month" in col.lower()
             ]
 
             if possible_date_cols:
-                print(f"- Possible date columns found: {possible_date_cols}")
+                print(f"- Possible date/month columns found: {possible_date_cols}")
 
             possible_nav_cols = [
                 col for col in df.columns
@@ -72,7 +74,7 @@ def load_all_csv_files():
 
             possible_code_cols = [
                 col for col in df.columns
-                if "code" in col.lower() or "scheme" in col.lower()
+                if "code" in col.lower() or "scheme" in col.lower() or "amfi" in col.lower()
             ]
 
             if possible_code_cols:
@@ -86,6 +88,14 @@ def load_all_csv_files():
     return datasets
 
 
+def find_dataset_key(datasets, keywords):
+    for key in datasets:
+        lower_key = key.lower()
+        if all(keyword in lower_key for keyword in keywords):
+            return key
+    return None
+
+
 def explore_fund_master(datasets):
     print("=" * 100)
     print("FUND MASTER EXPLORATION")
@@ -93,7 +103,8 @@ def explore_fund_master(datasets):
     fund_master_key = None
 
     for key in datasets:
-        if "fund" in key.lower() and "master" in key.lower():
+        lower_key = key.lower()
+        if "fund_master" in lower_key or "fund" in lower_key and "master" in lower_key:
             fund_master_key = key
             break
 
@@ -105,20 +116,27 @@ def explore_fund_master(datasets):
 
     print(f"Using file: {fund_master_key}.csv")
 
-    columns_to_check = [
-        "fund_house",
-        "category",
-        "sub_category",
-        "risk_grade",
-        "scheme_code"
-    ]
+    column_aliases = {
+        "fund_house": ["fund_house"],
+        "category": ["category"],
+        "sub_category": ["sub_category"],
+        "risk": ["risk_grade", "risk_category"],
+        "scheme_code": ["scheme_code", "amfi_code", "code"],
+    }
 
-    for col in columns_to_check:
-        if col in fund_master.columns:
-            print(f"\nUnique values in {col}:")
-            print(fund_master[col].dropna().unique())
+    for display_name, possible_cols in column_aliases.items():
+        found_col = None
+
+        for col in possible_cols:
+            if col in fund_master.columns:
+                found_col = col
+                break
+
+        if found_col:
+            print(f"\nUnique values in {found_col}:")
+            print(fund_master[found_col].dropna().unique())
         else:
-            print(f"\nColumn not found: {col}")
+            print(f"\nColumn not found for: {display_name}")
 
 
 def validate_amfi_codes(datasets):
@@ -131,10 +149,10 @@ def validate_amfi_codes(datasets):
     for key in datasets:
         lower_key = key.lower()
 
-        if "fund" in lower_key and "master" in lower_key:
+        if "fund_master" in lower_key or ("fund" in lower_key and "master" in lower_key):
             fund_master_key = key
 
-        if "nav" in lower_key and "history" in lower_key:
+        if "nav_history" in lower_key or ("nav" in lower_key and "history" in lower_key):
             nav_history_key = key
 
     if fund_master_key is None:
@@ -148,26 +166,30 @@ def validate_amfi_codes(datasets):
     fund_master = datasets[fund_master_key]
     nav_history = datasets[nav_history_key]
 
-    possible_fund_code_cols = [
-        col for col in fund_master.columns
-        if "scheme" in col.lower() and "code" in col.lower()
-    ]
+    possible_code_cols = ["scheme_code", "amfi_code", "code"]
 
-    possible_nav_code_cols = [
-        col for col in nav_history.columns
-        if "scheme" in col.lower() and "code" in col.lower()
-    ]
+    fund_code_col = None
+    nav_code_col = None
 
-    if not possible_fund_code_cols:
-        print("No scheme code column found in fund_master.")
+    for col in possible_code_cols:
+        if col in fund_master.columns:
+            fund_code_col = col
+            break
+
+    for col in possible_code_cols:
+        if col in nav_history.columns:
+            nav_code_col = col
+            break
+
+    if fund_code_col is None:
+        print("No AMFI/scheme code column found in fund_master.")
+        print("Available columns:", list(fund_master.columns))
         return
 
-    if not possible_nav_code_cols:
-        print("No scheme code column found in nav_history.")
+    if nav_code_col is None:
+        print("No AMFI/scheme code column found in nav_history.")
+        print("Available columns:", list(nav_history.columns))
         return
-
-    fund_code_col = possible_fund_code_cols[0]
-    nav_code_col = possible_nav_code_cols[0]
 
     print(f"Using fund_master code column: {fund_code_col}")
     print(f"Using nav_history code column: {nav_code_col}")
@@ -183,24 +205,27 @@ def validate_amfi_codes(datasets):
 
     if missing_in_nav:
         print("\nMissing AMFI codes:")
-        print(list(missing_in_nav)[:50])
+        print(sorted(list(missing_in_nav))[:50])
     else:
-        print("\nAll fund_master scheme codes exist in nav_history.")
+        print("\nAll fund_master AMFI codes exist in nav_history.")
 
     print("\nDATA QUALITY SUMMARY")
-    print("- CSV files loaded successfully from data/raw.")
-    print(f"- fund_master contains {len(fund_codes)} unique AMFI scheme codes.")
-    print(f"- nav_history contains {len(nav_codes)} unique AMFI scheme codes.")
-    print(f"- {len(missing_in_nav)} fund_master codes are missing in nav_history.")
+    print("- Loaded all available CSV datasets from data/raw.")
+    print(f"- fund_master contains {len(fund_codes)} unique AMFI codes.")
+    print(f"- nav_history contains {len(nav_codes)} unique AMFI codes.")
+    print(f"- {len(missing_in_nav)} fund_master AMFI codes are missing in nav_history.")
+    print("- Most datasets have no missing values or duplicate rows.")
+    print("- 04_monthly_sip_inflows.csv has missing values in yoy_growth_pct.")
+    print("- This is likely because YoY growth cannot be calculated for the first 12 months.")
+    print("- Date/month columns are currently stored as object/string and should be converted to datetime in preprocessing.")
+    print("- API scheme-code labels show inconsistencies and should be verified before final analysis.")
 
-    print("\nRecommended cleaning for next step:")
-    print("- Convert date columns to datetime.")
-    print("- Convert NAV columns to numeric.")
-    print("- Standardize scheme_code columns as string.")
-    print("- Handle missing values and duplicate rows.")
 
-
-if __name__ == "__main__":
+def main():
     datasets = load_all_csv_files()
     explore_fund_master(datasets)
     validate_amfi_codes(datasets)
+
+
+if __name__ == "__main__":
+    main()
