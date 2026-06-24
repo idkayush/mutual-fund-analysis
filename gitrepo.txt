@@ -1,0 +1,5 @@
+GitHub Repository:
+https://github.com/idkayush/mutual-fund-analysis
+
+Commit Message:
+Day 1: Data ingestion complete
