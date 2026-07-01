@@ -1,0 +1,44 @@
+-- KPI measures
+Total AUM Cr = SUM(fact_aum[aum_crore])
+
+Total AUM Lakh Cr = DIVIDE([Total AUM Cr], 100000)
+
+Latest AUM Cr =
+VAR LatestDate = MAX(fact_aum[date_id])
+RETURN CALCULATE(SUM(fact_aum[aum_crore]), fact_aum[date_id] = LatestDate)
+
+Latest AUM Lakh Cr = DIVIDE([Latest AUM Cr], 100000)
+
+Latest SIP Inflow Cr =
+VAR LatestMonth = MAX(monthly_sip_inflows[month])
+RETURN CALCULATE(SUM(monthly_sip_inflows[sip_inflow_crore]), monthly_sip_inflows[month] = LatestMonth)
+
+Latest Folios Cr =
+VAR LatestMonth = MAX(industry_folio_count[month])
+RETURN CALCULATE(SUM(industry_folio_count[total_folios_crore]), industry_folio_count[month] = LatestMonth)
+
+Scheme Count = DISTINCTCOUNT(dim_fund[amfi_code])
+
+Total Transaction Amount = SUM(fact_transactions[amount_inr])
+
+Transaction Count = COUNTROWS(fact_transactions)
+
+SIP Amount =
+CALCULATE(SUM(fact_transactions[amount_inr]), fact_transactions[transaction_type] = "SIP")
+
+Average SIP Amount =
+CALCULATE(AVERAGE(fact_transactions[amount_inr]), fact_transactions[transaction_type] = "SIP")
+
+Redemption Amount =
+CALCULATE(SUM(fact_transactions[amount_inr]), fact_transactions[transaction_type] = "Redemption")
+
+Lumpsum Amount =
+CALCULATE(SUM(fact_transactions[amount_inr]), fact_transactions[transaction_type] = "Lumpsum")
+
+Average Sharpe Ratio = AVERAGE(fact_performance[sharpe_ratio])
+
+Average Return 3Y = AVERAGE(fact_performance[return_3yr_pct])
+
+Average StdDev = AVERAGE(fact_performance[std_dev_ann_pct])
+
+Max AUM Fund = MAX(fact_performance[aum_crore])
